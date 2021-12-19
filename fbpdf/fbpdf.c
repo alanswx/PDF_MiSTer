@@ -22,8 +22,11 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <fcntl.h>
 #include "draw.h"
 #include "doc.h"
+#include "joystick.h"
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 #define MAX(a, b)	((a) > (b) ? (a) : (b))
@@ -53,6 +56,13 @@ static int rotate;
 static int count;
 static int invert;		/* invert colors? */
 
+static void printloading()
+{
+	printf("\x1b[H");
+	printf("LOADING:     file:%s  page:%d(%d)  zoom:%d%% \x1b[K\r",
+		filename, num, doc_pages(doc), zoom);
+	fflush(stdout);
+}
 static void draw(void)
 {
 	int bpp = FBM_BPP(fb_mode());
@@ -79,6 +89,7 @@ static int loadpage(int p)
 		return 1;
 	prows = 0;
 	free(pbuf);
+	printloading();
 	pbuf = doc_draw(doc, p, zoom, rotate, &prows, &pcols);
 	if (invert) {
 		for (i = 0; i < prows * pcols; i++)
@@ -141,6 +152,7 @@ static void printinfo(void)
 		filename, num, doc_pages(doc), zoom);
 	fflush(stdout);
 }
+
 
 static void term_setup(void)
 {
@@ -207,20 +219,122 @@ static int lmargin(void)
 	return ret;
 }
 
+
 static void mainloop(void)
 {
+    const char *device;
+    int js;
+    struct js_event event;
+    struct axis_state axes[3] = {0};
+    size_t axis;
 	int step = srows / PAGESTEPS;
 	int hstep = scols / PAGESTEPS;
 	int c;
+	int done=0;
+	struct timeval tv;
+	fd_set fds;
+	tv.tv_sec=0;
+	tv.tv_usec=0;
+
 	term_setup();
 	signal(SIGCONT, sigcont);
 	loadpage(num);
 	srow = prow;
 	scol = -scols / 2;
+    device = "/dev/input/js0";
+
+    js = open(device, O_RDONLY);
+
+    // default to width
+    zoom_page(pcols ? zoom * scols / pcols : zoom);
+
+
+    if (js == -1)
+        perror("Could not open joystick");
+
+    /* This loop will exit if the controller is unplugged. */
 	draw();
-	while ((c = readkey()) != -1) {
-		if (c == 'q')
+	while (!done) {
+	  FD_ZERO(&fds);
+	  FD_SET(STDIN_FILENO,&fds);
+	  FD_SET(js,&fds);
+	  select(js+1,&fds,NULL,NULL,&tv);
+	  if (FD_ISSET(js,&fds) && read_event(js, &event) == 0) {
+	//	  fprintf(stderr,"inside joystick\n");
+        switch (event.type)
+        {
+            case JS_EVENT_BUTTON:
+		    if (event.value) {
+			    switch(event.number) {
+				    case 0:
+					if (!loadpage(num + getcount(1)))
+						srow = prow;
+					break;
+				    case 1:
+					if (!loadpage(num - getcount(1)))
+						srow = prow;
+					break;
+				    case 2:
+					if (!loadpage(num + getcount(10)))
+						srow = prow;
+					break;
+				    case 3:
+					if (!loadpage(num - getcount(10)))
+						srow = prow;
+					break;
+			    }
+		    }
+		//printf("\x1b[H");
+                //printf("Button %u %s\n", event.number, event.value ? "pressed" : "released");
+                break;
+            case JS_EVENT_AXIS:
+                axis = get_axis_state(&event, axes);
+		if (axis==0)
+		{
+			if (axes[0].y>0 || axes[0].y<0){
+				if (axes[0].y>0)
+					srow += step * getcount(1);
+				if (axes[0].y<0)
+					srow -= step * getcount(1);
+				if (srow >= (prow+prows-srows)) srow = prow + prows - srows;
+		        	if (srow<=-srows) srow=prow;
+			} else {
+
+			if (axes[0].x>0)
+				scol += step * getcount(1);
+			if (axes[0].x<0)
+				scol -= step * getcount(1);
+
+		        if (scol<=pcol) scol=pcol;
+		        if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
+			}
+		}
+                //if (axis < 3)
+		//{printf("\x1b[H");
+                //    printf("Axis %zu at (%6d, %6d)\n", axis, axes[axis].x, axes[axis].y);
+		//}
+                break;
+            default:
+                /* Ignore init events. */
+                break;
+
+        }
+	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
+	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
+	draw();
+        
+
+	}
+	if (FD_ISSET(0,&fds)) {
+		  //fprintf(stderr,"inside keyboard\n");
+	        c = readkey();
+		printf("\x1b[H");
+		printf("%c",c);
+	//while ((c = readkey()) != -1) 
+		if (c == 'q') {
+			done=1;
 			break;
+		}
 		if (c == 'e' && reload())
 			break;
 		switch (c) {	/* commands that do not require redrawing */
@@ -350,7 +464,9 @@ static void mainloop(void)
 		scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
 		draw();
 	}
+	}
 	term_cleanup();
+    close(js);
 }
 
 static char *usage =
@@ -389,8 +505,9 @@ int main(int argc, char *argv[])
 	scols = fb_cols();
 	if (FBM_BPP(fb_mode()) != sizeof(fbval_t))
 		fprintf(stderr, "fbpdf: fbval_t doesn't match fb depth\n");
-	else
+	else{
 		mainloop();
+	}
 	fb_free();
 	free(pbuf);
 	if (doc)
