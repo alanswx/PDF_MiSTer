@@ -296,26 +296,27 @@ static void mainloop(void)
                 break;
             case JS_EVENT_AXIS:
                 axis = get_axis_state(&event, axes);
-		if (axis==0)
-		{
-			if (axes[0].y>0 || axes[0].y<0){
-				if (axes[0].y>0)
-					srow += step * getcount(1);
-				if (axes[0].y<0)
-					srow -= step * getcount(1);
-				if (srow >= (prow+prows-srows)) srow = prow + prows - srows;
-		        	if (srow<=-srows) srow=prow;
-			} else {
+                if (axis==0) {
+                    if (axes[0].y>0 || axes[0].y<0) {
+                         if (axes[0].y>0)
+                            srow += step * getcount(1);
+                         if (axes[0].y<0)
+                            srow -= step * getcount(1);
 
-			if (axes[0].x>0)
-				scol += hstep * getcount(1);
-			if (axes[0].x<0)
-				scol -= hstep * getcount(1);
+			 // try to make us lock to the viewport
+                         if (srow >= (prow+prows-srows)) srow = prow + prows - srows;
+                         if (srow<=-srows) srow=prow;
+                    } else {
+
+                        if (axes[0].x>0)
+                            scol += hstep * getcount(1);
+                        if (axes[0].x<0)
+                            scol -= hstep * getcount(1);
 
 		        if (scol<=pcol) scol=pcol;
 		        if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
-			}
-		}
+                   }
+               }
                 //if (axis < 3)
 		//{printf("\x1b[H");
                 //    printf("Axis %zu at (%6d, %6d)\n", axis, axes[axis].x, axes[axis].y);
