@@ -89,6 +89,7 @@ static int loadpage(int p)
 		return 1;
 	prows = 0;
 	free(pbuf);
+	num = p;
 	printloading();
 	pbuf = doc_draw(doc, p, zoom, rotate, &prows, &pcols);
 	if (invert) {
@@ -97,7 +98,6 @@ static int loadpage(int p)
 	}
 	prow = -prows / 2;
 	pcol = -pcols / 2;
-	num = p;
 	return 0;
 }
 
@@ -227,63 +227,70 @@ static void mainloop(void)
     struct js_event event;
     struct axis_state axes[3] = {0};
     size_t axis;
-	int step = srows / PAGESTEPS;
-	int hstep = scols / PAGESTEPS;
-	int c;
-	int done=0;
-	struct timeval tv;
-	fd_set fds;
-	tv.tv_sec=0;
-	tv.tv_usec=0;
 
-	term_setup();
-	signal(SIGCONT, sigcont);
-	loadpage(num);
-	srow = prow;
-	scol = -scols / 2;
+    int step = srows / PAGESTEPS;
+    int hstep = scols / PAGESTEPS;
+    int c;
+    int done=0;
+    struct timeval tv;
+    fd_set fds;
+
+    // set timeout to zero for select
+    tv.tv_sec=0;
+    tv.tv_usec=0;
+
+    term_setup();
+    signal(SIGCONT, sigcont);
+    loadpage(num);
+    srow = prow;
+    scol = -scols / 2;
+
+    // open joystick 0 
     device = "/dev/input/js0";
-
     js = open(device, O_RDONLY);
+    if (js == -1)
+        perror("Could not open joystick");
 
     // default to width
     zoom_page(pcols ? zoom * scols / pcols : zoom);
 
 
-    if (js == -1)
-        perror("Could not open joystick");
 
-    /* This loop will exit if the controller is unplugged. */
-	draw();
-	while (!done) {
-	  FD_ZERO(&fds);
-	  FD_SET(STDIN_FILENO,&fds);
-	  FD_SET(js,&fds);
-	  select(js+1,&fds,NULL,NULL,&tv);
-	  if (FD_ISSET(js,&fds) && read_event(js, &event) == 0) {
-	//	  fprintf(stderr,"inside joystick\n");
-        switch (event.type)
-        {
+    draw();
+
+    while (!done) {
+        // setup the descriptors for select, checking on data read available for 
+	// STDIN and joystick (js)
+        FD_ZERO(&fds);
+        FD_SET(STDIN_FILENO,&fds);
+        FD_SET(js,&fds);
+        select(js+1,&fds,NULL,NULL,&tv);
+
+        // check to see if the joystick fd has data
+        if (FD_ISSET(js,&fds) && read_event(js, &event) == 0) {
+          switch (event.type)
+          {
             case JS_EVENT_BUTTON:
-		    if (event.value) {
-			    switch(event.number) {
-				    case 0:
-					if (!loadpage(num + getcount(1)))
-						srow = prow;
-					break;
-				    case 1:
-					if (!loadpage(num - getcount(1)))
-						srow = prow;
-					break;
-				    case 2:
-					if (!loadpage(num + getcount(10)))
-						srow = prow;
-					break;
-				    case 3:
-					if (!loadpage(num - getcount(10)))
-						srow = prow;
-					break;
-			    }
-		    }
+                if (event.value) {
+                    switch(event.number) {
+                         case 0:
+                             if (!loadpage(num + getcount(1)))
+                                 srow = prow;
+                         break;
+                         case 1:
+                             if (!loadpage(num - getcount(1)))
+                                 srow = prow;
+                         break;
+                         case 2:
+                             if (!loadpage(num + getcount(10)))
+                                 srow = prow;
+                         break;
+                         case 3:
+                             if (!loadpage(num - getcount(10)))
+                                 srow = prow;
+                         break;
+                    }
+               }
 		//printf("\x1b[H");
                 //printf("Button %u %s\n", event.number, event.value ? "pressed" : "released");
                 break;
@@ -301,9 +308,9 @@ static void mainloop(void)
 			} else {
 
 			if (axes[0].x>0)
-				scol += step * getcount(1);
+				scol += hstep * getcount(1);
 			if (axes[0].x<0)
-				scol -= step * getcount(1);
+				scol -= hstep * getcount(1);
 
 		        if (scol<=pcol) scol=pcol;
 		        if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
@@ -325,12 +332,12 @@ static void mainloop(void)
         
 
 	}
+	// keyboard handling from STDIN
 	if (FD_ISSET(0,&fds)) {
-		  //fprintf(stderr,"inside keyboard\n");
+                //fprintf(stderr,"inside keyboard\n");
 	        c = readkey();
 		printf("\x1b[H");
 		printf("%c",c);
-	//while ((c = readkey()) != -1) 
 		if (c == 'q') {
 			done=1;
 			break;
