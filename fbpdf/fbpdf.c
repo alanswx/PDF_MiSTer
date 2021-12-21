@@ -253,9 +253,6 @@ static void mainloop(void)
 
     // default to width
     zoom_page(pcols ? zoom * scols / pcols : zoom);
-
-
-
     draw();
 
     while (!done) {
@@ -289,6 +286,12 @@ static void mainloop(void)
                              if (!loadpage(num - getcount(10)))
                                  srow = prow;
                          break;
+                         case 4:
+                             zoom_page(prows ? zoom * srows / prows : zoom);
+                         break;
+                         case 5:
+                             zoom_page(pcols ? zoom * scols / pcols : zoom);
+                         break;
                     }
                }
 		//printf("\x1b[H");
@@ -297,26 +300,30 @@ static void mainloop(void)
             case JS_EVENT_AXIS:
                 axis = get_axis_state(&event, axes);
                 if (axis==0) {
-                    if (axes[0].y>0 || axes[0].y<0) {
-                         if (axes[0].y>0)
+                    if (axes[0].y>4 || axes[0].y<-4) {
+                         if (axes[0].y>4)
                             srow += step * getcount(1);
-                         if (axes[0].y<0)
+                         if (axes[0].y<-4){
                             srow -= step * getcount(1);
+			   }
 
 			 // try to make us lock to the viewport
-                         if (srow >= (prow+prows-srows)) srow = prow + prows - srows;
-                         if (srow<=-srows) srow=prow;
-                    } else {
+			 if (srow < prow) srow=prow;
+			 if (prow+srow>-srows) srow = prows - srows+ prow;
+                    } else if (axes[0].x>4 || axes[0].x<-4) {
 
-                        if (axes[0].x>0)
+                        if (axes[0].x>4)
                             scol += hstep * getcount(1);
-                        if (axes[0].x<0)
+                        if (axes[0].x<-4)
                             scol -= hstep * getcount(1);
 
-		        if (scol<=pcol) scol=pcol;
-		        if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
+			 if (scol < pcol) scol=pcol;
+			 if (pcol+scol>-scols) scol = pcols - scols+ pcol;
+		        //if (scol<=pcol) scol=pcol;
+		        //if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
                    }
                }
+	
                 //if (axis < 3)
 		//{printf("\x1b[H");
                 //    printf("Axis %zu at (%6d, %6d)\n", axis, axes[axis].x, axes[axis].y);
@@ -330,6 +337,10 @@ static void mainloop(void)
 	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
 	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
 	draw();
+	printf("\x1b[H");
+	printf("INFO:  step %d hstep %d scol %d  pcol %d  pcols %d srow %d prow %d prows %d srows %d \x1b[K\r",
+			step,hstep,scol,pcol,pcols,srow,prow,prows,srows);
+	fflush(stdout);
         
 
 	}
@@ -472,8 +483,8 @@ static void mainloop(void)
 		scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
 		draw();
 	}
-	}
-	term_cleanup();
+    }
+    term_cleanup();
     close(js);
 }
 
