@@ -261,7 +261,8 @@ static void mainloop(void)
         FD_ZERO(&fds);
         FD_SET(STDIN_FILENO,&fds);
         FD_SET(js,&fds);
-        select(js+1,&fds,NULL,NULL,&tv);
+        //select(js+1,&fds,NULL,NULL,&tv);
+        select(js+1,&fds,NULL,NULL,NULL); // block forever
 
         // check to see if the joystick fd has data
         if (FD_ISSET(js,&fds) && read_event(js, &event) == 0) {
@@ -319,8 +320,6 @@ static void mainloop(void)
 
 			 if (scol < pcol) scol=pcol;
 			 if (pcol+scol>-scols) scol = pcols - scols+ pcol;
-		        //if (scol<=pcol) scol=pcol;
-		        //if (scol>=pcol+pcols-scols) scol=pcol+pcols-scols;
                    }
                }
 	
@@ -337,19 +336,29 @@ static void mainloop(void)
 	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
 	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
 	draw();
+#if 0
 	printf("\x1b[H");
 	printf("INFO:  step %d hstep %d scol %d  pcol %d  pcols %d srow %d prow %d prows %d srows %d \x1b[K\r",
 			step,hstep,scol,pcol,pcols,srow,prow,prows,srows);
 	fflush(stdout);
-        
+#endif    
 
 	}
 	// keyboard handling from STDIN
 	if (FD_ISSET(0,&fds)) {
                 //fprintf(stderr,"inside keyboard\n");
 	        c = readkey();
-		printf("\x1b[H");
-		printf("%c",c);
+		/*
+		if (c==0x1b) {
+			// if we get 1b without a second key, it is escape
+			// we need to check for blocking
+	        	c = readkey();
+			// next key should be the special key
+			printf("got 1b\n");
+			printf("second key: %x\n",c);
+			exit(0);
+		}
+		*/
 		if (c == 'q') {
 			done=1;
 			break;
@@ -482,6 +491,12 @@ static void mainloop(void)
 		srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
 		scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
 		draw();
+#if 0
+	printf("\x1b[H");
+	printf("KEYS:  key %c %x \x1b[K\r",
+			c,c);
+	fflush(stdout);
+#endif
 	}
     }
     term_cleanup();
