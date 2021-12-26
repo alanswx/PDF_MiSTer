@@ -27,6 +27,7 @@
 #include "draw.h"
 #include "doc.h"
 #include "joystick.h"
+#include "events.h"
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
 #define MAX(a, b)	((a) > (b) ? (a) : (b))
@@ -219,7 +220,110 @@ static int lmargin(void)
 	return ret;
 }
 
+static void mainloop_new(void)
+{
+    const char *device;
+    int js;
+    struct js_event event;
+    struct axis_state axes[3] = {0};
+    size_t axis;
 
+    int step = srows / PAGESTEPS;
+    int hstep = scols / PAGESTEPS;
+    int c;
+    int done=0;
+    struct timeval tv;
+    fd_set fds;
+
+    term_setup();
+    signal(SIGCONT, sigcont);
+    loadpage(num);
+    srow = prow;
+    scol = -scols / 2;
+
+    int err = open_input_devices();
+
+    // default to width
+    zoom_page(pcols ? zoom * scols / pcols : zoom);
+    draw();
+
+    while (!done) {
+      struct input_event ev;
+      err = read_input_devices(&ev,1000);
+      if (err==1) {
+         //fprintf(stderr,"ev.code: %d ev.value %d ev.type %d\n",ev.code,ev.value,ev.type);
+     	 if (ev.type==EV_ABS) {
+		 // code is the axis
+		 // value is the direction
+                if (ev.code==1) {
+                    if (ev.value>200 || ev.value<-200) {
+                         if (ev.value>200)
+                            srow += step * getcount(1);
+                         if (ev.value<-200){
+                            srow -= step * getcount(1);
+			   }
+
+			 // try to make us lock to the viewport
+			 if (srow < prow) srow=prow;
+			 if (prow+srow>-srows) srow = prows - srows+ prow;
+		    }
+               } else if (ev.code==0) {
+		       if (ev.value>200 || ev.value<-200) {
+
+                        if (ev.value>200)
+                            scol += hstep * getcount(1);
+                        if (ev.value<-200)
+                            scol -= hstep * getcount(1);
+
+			 if (scol < pcol) scol=pcol;
+			 if (pcol+scol>-scols) scol = pcols - scols+ pcol;
+                   }
+               }
+	 } else if (ev.type==EV_KEY) {
+		 // ev.code >= 256 are joystick buttons
+		 switch (ev.code) {
+			 case KEY_ESC:  // ESC
+				 done=1;
+			 break;
+			case KEY_HOME:
+				srow = prow;
+			break;
+			case KEY_END:
+			srow = prow + prows - srows;
+			break;
+                         case BTN_A:
+                             if (!loadpage(num + getcount(1)))
+                                 srow = prow;
+                         break;
+                         case BTN_B:
+                             if (!loadpage(num - getcount(1)))
+                                 srow = prow;
+                         break;
+                         case BTN_X:
+                             if (!loadpage(num + getcount(10)))
+                                 srow = prow;
+                         break;
+                         case BTN_Y:
+                             if (!loadpage(num - getcount(10)))
+                                 srow = prow;
+                         break;
+                         case BTN_TL:
+                             zoom_page(prows ? zoom * srows / prows : zoom);
+                         break;
+                         case BTN_TR:
+                             zoom_page(pcols ? zoom * scols / pcols : zoom);
+                         break;
+		 }
+	 }
+	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
+	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
+	draw();
+     }
+   }
+
+   term_cleanup();
+
+}
 static void mainloop(void)
 {
     const char *device;
@@ -540,7 +644,7 @@ int main(int argc, char *argv[])
 	if (FBM_BPP(fb_mode()) != sizeof(fbval_t))
 		fprintf(stderr, "fbpdf: fbval_t doesn't match fb depth\n");
 	else{
-		mainloop();
+		mainloop_new();
 	}
 	fb_free();
 	free(pbuf);
