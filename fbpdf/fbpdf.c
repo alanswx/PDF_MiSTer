@@ -313,6 +313,19 @@ static void mainloop_new(void)
                          case BTN_TR:
                              zoom_page(pcols ? zoom * scols / pcols : zoom);
                          break;
+			 case BTN_SELECT:
+			 	rotate = rotate +90;
+				if (rotate>=360) rotate=0;
+				if (!loadpage(num))
+					srow = prow;
+				break;
+				/*
+			 case BTN_TR2:
+			 	rotate = rotate -90;
+				if (!loadpage(num))
+					srow = prow;
+				break;
+				*/
 		 }
 	 }
 	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
