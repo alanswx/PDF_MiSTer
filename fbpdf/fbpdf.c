@@ -105,7 +105,7 @@ static int loadpage(int p)
 static void zoom_page(int z)
 {
 	int _zoom = zoom;
-	zoom = MIN(MAXZOOM, MAX(1, z));
+	zoom = MIN(MAXZOOM, MAX(50, z));
 	if (!loadpage(num))
 		srow = srow * zoom / _zoom;
 }
@@ -512,7 +512,6 @@ uint32_t get_ps2_code(uint16_t key)
 	return ev2ps2[key];
 }
 
-
 static void mainloop_new(void)
 {
     int step = srows / PAGESTEPS;
@@ -521,6 +520,7 @@ static void mainloop_new(void)
 
     term_setup();
     signal(SIGCONT, sigcont);
+
     loadpage(num);
     srow = prow;
     scol = -scols / 2;
@@ -540,10 +540,10 @@ static void mainloop_new(void)
 		 // code is the axis
 		 // value is the y direction
                 if (ev.code==1) {
-                    if (ev.value>200 || ev.value<-200) {
-                         if (ev.value>200)
+                    if (ev.value>110 || ev.value<-110) {
+                         if (ev.value>110)
                             srow += step * getcount(1);
-                         if (ev.value<-200){
+                         if (ev.value<-110){
                             srow -= step * getcount(1);
 			   }
 
@@ -552,11 +552,11 @@ static void mainloop_new(void)
 			 if (prow+srow>-srows) srow = prows - srows+ prow;
 		    }
                } else if (ev.code==0) {
-		       if (ev.value>200 || ev.value<-200) {
+		       if (ev.value>110 || ev.value<-110) {
 
-                        if (ev.value>200)
+                        if (ev.value>110)
                             scol += hstep * getcount(1);
-                        if (ev.value<-200)
+                        if (ev.value<-110)
                             scol -= hstep * getcount(1);
 
 			 if (scol < pcol) scol=pcol;
@@ -609,7 +609,7 @@ static void mainloop_new(void)
 			 break;
 			case KEY_DOWN:
 			 	if (shift && ctrl) {
-                         		if (!loadpage(1  ))
+                         		if (!loadpage(getcount(doc_pages(doc) ) ))
                                	 		srow = prow;
 
 				} else { // up arrow - scroll up
@@ -620,12 +620,19 @@ static void mainloop_new(void)
 				}
 			 break;
 			case KEY_LEFT:
-                             if (!loadpage(num - getcount(1)))
-                                 srow = prow;
+                            scol -= hstep * getcount(1);
+
+			     if (scol < pcol) scol=pcol;
+			     if (pcol+scol>-scols) scol = pcols - scols+ pcol;
+                            // if (!loadpage(num - getcount(1)))
+                             //    srow = prow;
 			 break;
 			case KEY_RIGHT:
-                             if (!loadpage(num + getcount(1)))
-                                 srow = prow;
+                            scol += hstep * getcount(1);
+			     if (scol < pcol) scol=pcol;
+		   	    if (pcol+scol>-scols) scol = pcols - scols+ pcol;
+                         //    if (!loadpage(num + getcount(1)))
+                          //       srow = prow;
 			 break;
 			case KEY_PAGEUP:
 			 	if (shift && ctrl) {
@@ -653,14 +660,12 @@ static void mainloop_new(void)
 			break;
 			case KEY_MINUS:
 				if (ctrl) {
-				   count -= 10;
-				   zoom_page(getcount(zoom_def));
+				   zoom_page(zoom - 75);
 				}
 			break;
 			case KEY_EQUAL:
 			 	if (ctrl) {
-				   count *= 10;
-				   zoom_page(getcount(zoom_def));
+				   zoom_page(zoom + 75);
 				}
 			break;
 
