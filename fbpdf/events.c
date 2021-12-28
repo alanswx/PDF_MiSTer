@@ -196,6 +196,7 @@ int open_input_devices()
 					}
 
 					//skip our virtual device
+#if 0
 					if (!strcmp(input[n].name, UINPUT_NAME))
 					{
 						close(pool[n].fd);
@@ -203,6 +204,7 @@ int open_input_devices()
 						//fprintf(stderr,"skipping MiSTer input\n");
 						continue;
 					}
+#endif
 
 					n++;
 					if (n >= NUMDEV) break;

@@ -518,12 +518,15 @@ static void mainloop_new(void)
     int hstep = scols / PAGESTEPS;
     int done=0;
 
+    struct timeval nowtime;
+
     term_setup();
     signal(SIGCONT, sigcont);
 
     loadpage(num);
     srow = prow;
     scol = -scols / 2;
+    draw();
 
     int err = open_input_devices();
 
@@ -537,6 +540,7 @@ static void mainloop_new(void)
       if (err==1) {
          //fprintf(stderr,"ev.code: %d ev.value %d ev.type %d\n",ev.code,ev.value,ev.type);
      	 if (ev.type==EV_ABS) {
+#if 0
 		 // code is the axis
 		 // value is the y direction
                 if (ev.code==1) {
@@ -563,6 +567,7 @@ static void mainloop_new(void)
 			 if (pcol+scol>-scols) scol = pcols - scols+ pcol;
                    }
                }
+#endif
 	 } else if (ev.type==EV_KEY) {
 
 		 if (ev.code <256) {
@@ -575,6 +580,13 @@ static void mainloop_new(void)
 		int shift = (get_key_mod() & LSHIFT) || (get_key_mod() & RSHIFT);
                 int ctrl  = (get_key_mod() & (LCTRL | RCTRL));
 		 // ev.code >= 256 are joystick buttons
+		
+		 //  Check time
+	         gettimeofday(&nowtime,NULL);
+		 struct timeval result;
+		timersub(&nowtime,&ev.time,&result);
+		double time_in_mill = (result.tv_sec)*1000+(result.tv_usec)/1000;
+		if (time_in_mill < 500)
 		 switch (ev.code) {
 			 case KEY_HOME:
                          if (!loadpage(1  ))
@@ -620,19 +632,26 @@ static void mainloop_new(void)
 				}
 			 break;
 			case KEY_LEFT:
+#if 0
                             scol -= hstep * getcount(1);
 
 			     if (scol < pcol) scol=pcol;
 			     if (pcol+scol>-scols) scol = pcols - scols+ pcol;
-                            // if (!loadpage(num - getcount(1)))
-                             //    srow = prow;
+#else
+                             if (!loadpage(num - getcount(1)))
+                                 srow = prow;
+#endif
 			 break;
 			case KEY_RIGHT:
+#if 0
                             scol += hstep * getcount(1);
 			     if (scol < pcol) scol=pcol;
 		   	    if (pcol+scol>-scols) scol = pcols - scols+ pcol;
-                         //    if (!loadpage(num + getcount(1)))
-                          //       srow = prow;
+#else
+
+                             if (!loadpage(num + getcount(1)))
+                                 srow = prow;
+#endif
 			 break;
 			case KEY_PAGEUP:
 			 	if (shift && ctrl) {
@@ -709,7 +728,9 @@ static void mainloop_new(void)
 	 }
 	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
 	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
+
 	draw();
+	
      }
    }
 
