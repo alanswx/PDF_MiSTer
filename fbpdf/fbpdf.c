@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include "draw.h"
 #include "doc.h"
-#include "joystick.h"
 #include "events.h"
 
 #define MIN(a, b)	((a) < (b) ? (a) : (b))
@@ -540,6 +539,8 @@ static void mainloop_new(void)
       if (err==1) {
          //fprintf(stderr,"ev.code: %d ev.value %d ev.type %d\n",ev.code,ev.value,ev.type);
      	 if (ev.type==EV_ABS) {
+//
+// REMOVE THE ABS code, because mister sends us arrow keys for the joystick, all nicely mapped
 #if 0
 		 // code is the axis
 		 // value is the y direction
@@ -688,6 +689,9 @@ static void mainloop_new(void)
 				}
 			break;
 
+#if 0
+// remove this code, because we are going to use <esc> and <enter> sent by the mister
+// all nicely mapped
 			// https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/input-event-codes.h#L381
                          case BTN_A:
                              if (!loadpage(num + getcount(1)))
@@ -724,6 +728,7 @@ static void mainloop_new(void)
 					srow = prow;
 				break;
 				*/
+#endif
 		 }
 	 }
 	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
@@ -736,288 +741,6 @@ static void mainloop_new(void)
 
    term_cleanup();
 
-}
-static void mainloop(void)
-{
-    const char *device;
-    int js;
-    struct js_event event;
-    struct axis_state axes[3] = {0};
-    size_t axis;
-
-    int step = srows / PAGESTEPS;
-    int hstep = scols / PAGESTEPS;
-    int c;
-    int done=0;
-    struct timeval tv;
-    fd_set fds;
-
-    // set timeout to zero for select
-    tv.tv_sec=0;
-    tv.tv_usec=0;
-
-    term_setup();
-    signal(SIGCONT, sigcont);
-    loadpage(num);
-    srow = prow;
-    scol = -scols / 2;
-
-    // open joystick 0 
-    device = "/dev/input/js0";
-    js = open(device, O_RDONLY);
-    if (js == -1)
-        perror("Could not open joystick");
-
-    // default to width
-    zoom_page(pcols ? zoom * scols / pcols : zoom);
-    draw();
-
-    while (!done) {
-        // setup the descriptors for select, checking on data read available for 
-	// STDIN and joystick (js)
-        FD_ZERO(&fds);
-        FD_SET(STDIN_FILENO,&fds);
-        FD_SET(js,&fds);
-        //select(js+1,&fds,NULL,NULL,&tv);
-        select(js+1,&fds,NULL,NULL,NULL); // block forever
-
-        // check to see if the joystick fd has data
-        if (FD_ISSET(js,&fds) && read_event(js, &event) == 0) {
-          switch (event.type)
-          {
-            case JS_EVENT_BUTTON:
-                if (event.value) {
-                    switch(event.number) {
-                         case 0:
-                             if (!loadpage(num + getcount(1)))
-                                 srow = prow;
-                         break;
-                         case 1:
-                             if (!loadpage(num - getcount(1)))
-                                 srow = prow;
-                         break;
-                         case 2:
-                             if (!loadpage(num + getcount(10)))
-                                 srow = prow;
-                         break;
-                         case 3:
-                             if (!loadpage(num - getcount(10)))
-                                 srow = prow;
-                         break;
-                         case 4:
-                             zoom_page(prows ? zoom * srows / prows : zoom);
-                         break;
-                         case 5:
-                             zoom_page(pcols ? zoom * scols / pcols : zoom);
-                         break;
-                    }
-               }
-		//printf("\x1b[H");
-                //printf("Button %u %s\n", event.number, event.value ? "pressed" : "released");
-                break;
-            case JS_EVENT_AXIS:
-                axis = get_axis_state(&event, axes);
-                if (axis==0) {
-                    if (axes[0].y>4 || axes[0].y<-4) {
-                         if (axes[0].y>4)
-                            srow += step * getcount(1);
-                         if (axes[0].y<-4){
-                            srow -= step * getcount(1);
-			   }
-
-			 // try to make us lock to the viewport
-			 if (srow < prow) srow=prow;
-			 if (prow+srow>-srows) srow = prows - srows+ prow;
-                    } else if (axes[0].x>4 || axes[0].x<-4) {
-
-                        if (axes[0].x>4)
-                            scol += hstep * getcount(1);
-                        if (axes[0].x<-4)
-                            scol -= hstep * getcount(1);
-
-			 if (scol < pcol) scol=pcol;
-			 if (pcol+scol>-scols) scol = pcols - scols+ pcol;
-                   }
-               }
-	
-                //if (axis < 3)
-		//{printf("\x1b[H");
-                //    printf("Axis %zu at (%6d, %6d)\n", axis, axes[axis].x, axes[axis].y);
-		//}
-                break;
-            default:
-                /* Ignore init events. */
-                break;
-
-        }
-	srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
-	scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
-	draw();
-#if 0
-	printf("\x1b[H");
-	printf("INFO:  step %d hstep %d scol %d  pcol %d  pcols %d srow %d prow %d prows %d srows %d \x1b[K\r",
-			step,hstep,scol,pcol,pcols,srow,prow,prows,srows);
-	fflush(stdout);
-#endif    
-
-	}
-	// keyboard handling from STDIN
-	if (FD_ISSET(0,&fds)) {
-                //fprintf(stderr,"inside keyboard\n");
-	        c = readkey();
-		/*
-		if (c==0x1b) {
-			// if we get 1b without a second key, it is escape
-			// we need to check for blocking
-	        	c = readkey();
-			// next key should be the special key
-			printf("got 1b\n");
-			printf("second key: %x\n",c);
-			exit(0);
-		}
-		*/
-		if (c == 'q') {
-			done=1;
-			break;
-		}
-		if (c == 'e' && reload())
-			break;
-		switch (c) {	/* commands that do not require redrawing */
-		case 'o':
-			numdiff = num - getcount(num);
-			break;
-		case 'Z':
-			count *= 10;
-			zoom_def = getcount(zoom);
-			break;
-		case 'i':
-			printinfo();
-			break;
-		case 27:
-			count = 0;
-			break;
-		case 'm':
-			setmark(readkey());
-			break;
-		case 'd':
-			sleep(getcount(1));
-			break;
-		default:
-			if (isdigit(c))
-				count = count * 10 + c - '0';
-		}
-		switch (c) {	/* commands that require redrawing */
-		case CTRLKEY('f'):
-		case 'J':
-			if (!loadpage(num + getcount(1)))
-				srow = prow;
-			break;
-		case CTRLKEY('b'):
-		case 'K':
-			if (!loadpage(num - getcount(1)))
-				srow = prow;
-			break;
-		case 'G':
-			setmark('\'');
-			if (!loadpage(getcount(doc_pages(doc) - numdiff) + numdiff))
-				srow = prow;
-			break;
-		case 'O':
-			numdiff = num - getcount(num);
-			setmark('\'');
-			if (!loadpage(num + numdiff))
-				srow = prow;
-			break;
-		case 'z':
-			count *= 10;
-			zoom_page(getcount(zoom_def));
-			break;
-		case 'w':
-			zoom_page(pcols ? zoom * scols / pcols : zoom);
-			break;
-		case 'W':
-			if (lmargin() < rmargin())
-				zoom_page(zoom * (scols - hstep) /
-					(rmargin() - lmargin()));
-			break;
-		case 'f':
-			zoom_page(prows ? zoom * srows / prows : zoom);
-			break;
-		case 'r':
-			rotate = getcount(0);
-			if (!loadpage(num))
-				srow = prow;
-			break;
-		case '`':
-		case '\'':
-			jmpmark(readkey(), c == '`');
-			break;
-		case 'j':
-			srow += step * getcount(1);
-			break;
-		case 'k':
-			srow -= step * getcount(1);
-			break;
-		case 'l':
-			scol += hstep * getcount(1);
-			break;
-		case 'h':
-			scol -= hstep * getcount(1);
-			break;
-		case 'H':
-			srow = prow;
-			break;
-		case 'L':
-			srow = prow + prows - srows;
-			break;
-		case 'M':
-			srow = prow + prows / 2 - srows / 2;
-			break;
-		case 'C':
-			scol = -scols / 2;
-			break;
-		case ' ':
-		case CTRLKEY('d'):
-			srow += srows * getcount(1) - step;
-			break;
-		case 127:
-		case CTRLKEY('u'):
-			srow -= srows * getcount(1) - step;
-			break;
-		case '[':
-			scol = pcol;
-			break;
-		case ']':
-			scol = pcol + pcols - scols;
-			break;
-		case '{':
-			scol = pcol + lmargin() - hstep / 2;
-			break;
-		case '}':
-			scol = pcol + rmargin() + hstep / 2 - scols;
-			break;
-		case CTRLKEY('l'):
-			break;
-		case 'I':
-			invert = !invert;
-			loadpage(num);
-			break;
-		default:	/* no need to redraw */
-			continue;
-		}
-		srow = MAX(prow - srows + MARGIN, MIN(prow + prows - MARGIN, srow));
-		scol = MAX(pcol - scols + MARGIN, MIN(pcol + pcols - MARGIN, scol));
-		draw();
-#if 0
-	printf("\x1b[H");
-	printf("KEYS:  key %c %x \x1b[K\r",
-			c,c);
-	fflush(stdout);
-#endif
-	}
-    }
-    term_cleanup();
-    close(js);
 }
 
 static char *usage =

@@ -151,7 +151,7 @@ int open_input_devices()
 	uint8_t key_b[KEY_MAX/8 + 1];
 
 	int timeout = 1000;
-	printf("Open up to %d input devices.\n", NUMDEV);
+	//printf("Open up to %d input devices.\n", NUMDEV);
 	for (int i = 0; i < NUMDEV; i++)
 	{
 		pool[i].fd = -1;
@@ -172,8 +172,8 @@ int open_input_devices()
 				memset(&input[n], 0, sizeof(input[n]));
 				sprintf(input[n].devname, "/dev/input/%s", de->d_name);
 				int fd = open(input[n].devname, O_RDWR | O_CLOEXEC);
-				printf("open(%s): %d\n", input[n].devname, fd);
-				printf("open(%s): %d\n", input[n].name, fd);
+				//printf("open(%s): %d\n", input[n].devname, fd);
+				//printf("open(%s): %d\n", input[n].name, fd);
 
 				if (fd > 0)
 				{
