@@ -3,7 +3,7 @@ CC = cc
 CFLAGS = -Wall -O2 -I$(PREFIX)/include
 LDFLAGS = -L$(PREFIX)/lib
 
-all: fbpdf fbpdf2 fbdjvu
+all: fbpdf fbpdf2 fbpdf3 fbdjvu
 %.o: %.c doc.h
 	$(CC) -c $(CFLAGS) $<
 clean:
@@ -26,5 +26,13 @@ fbpdf2: fbpdf.o poppler.o draw.o  events.o
 	-l:liblcms2.a \
 	-ltiff -ldl  -lstdc++ \
 	-l:libfontconfig.a \
-	-l:libuuid.a \
-	-l:libexpat.a
+	-luuid \
+	-lexpat
+
+fbpdf3: fbpdf.o poppler.o draw.o  events.o
+	$(CXX) -o $@ $^ $(LDFLAGS)  -l:libpoppler-cpp.a -l:libpoppler.a  -lpthread -lfreetype -lpng -ljpeg -lopenjp2 \
+	-llcms2 \
+	-ltiff -ldl  -lstdc++ \
+	-lfontconfig \
+	-luuid \
+	-lexpat
