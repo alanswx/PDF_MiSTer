@@ -11,3 +11,5 @@ build:
 run:
 	docker run -it --rm -v ${pwd}:/mister $(NAME):latest
 
+getexec:
+	docker run -it --rm -v ${pwd}:/mister $(NAME):latest bash -c "cp /usr/local/src/jfbview/build/src/jfbview /mister/jfbview.exec"

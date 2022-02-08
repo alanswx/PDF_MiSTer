@@ -167,6 +167,19 @@ RUN rm /usr/lib/arm-linux-gnueabihf/libjpeg.so
 RUN cp /usr/local/lib/libgraphite2.a /usr/lib/arm-linux-gnueabihf/
 RUN rm /usr/lib/arm-linux-gnueabihf/libgraphite2.so*
 
+
+
+#
+# grab a copy of the pdf viewer, patch it, build it
+#
+RUN cd /usr/local/src/ && git clone  --recurse-submodules  "https://github.com/jichu4n/jfbview.git" && \
+	 ls && cd jfbview  
+ADD jfbview.patch /usr/local/src/jfbview.patch
+RUN cd /usr/local/src/jfbview && patch < /usr/local/src/jfbview.patch -p1 
+RUN cd /usr/local/src/jfbview && mkdir build && cd build && cmake .. -DCMAKE_CXX_STANDARD_LIBRARIES="-lgraphite2" && make
+
+
+
 #RUN cd /usr/local/src/ &&  wget "https://github.com/mm2/Little-CMS/archive/refs/tags/lcms2.8.tar.gz" &&  \
 #	tar zxf lcms2.8.tar.gz  && ls && cd Little-CMS-lcms2.8 && ./autogen.sh &&  \
 #	make && make install
