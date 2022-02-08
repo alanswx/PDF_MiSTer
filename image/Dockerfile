@@ -42,7 +42,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y \
 	libmpc-dev \
 	libmpfr-dev \
  	libmupdf-dev \
-	libncurses5-dev \
+	#libncurses5-dev \
 	libpcap-dev \
 	libpng-dev \
 	libpoppler-cpp-dev \
@@ -140,8 +140,8 @@ LABEL \
 
 CMD ["/bin/bash"]
 
-RUN cd /usr/local/src/ &&  wget "https://github.com/ccxvii/mujs/archive/refs/tags/1.2.0.tar.gz" && \
-	tar zxf 1.2.0.tar.gz && ls && cd mujs-1.2.0 && make && make install
+#RUN cd /usr/local/src/ &&  wget "https://github.com/ccxvii/mujs/archive/refs/tags/1.2.0.tar.gz" && \
+#	tar zxf 1.2.0.tar.gz && ls && cd mujs-1.2.0 && make && make install
 
 RUN cd /usr/local/src/ &&  wget "https://github.com/silnrsi/graphite/archive/refs/tags/1.3.14.tar.gz" && \
 	tar zxf 1.3.14.tar.gz && ls && cd graphite-1.3.14 && mkdir build && cd build && cmake ../ -DBUILD_SHARED_LIBS:bool=off && \
@@ -152,19 +152,34 @@ RUN cd /usr/local/src/ &&  wget "https://github.com/uclouvain/openjpeg/archive/r
 	cmake ../ -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS:bool=off && \
 	make && make install
 
-RUN cd /usr/local/src/ &&  wget "https://github.com/mm2/Little-CMS/archive/refs/tags/lcms2.8.tar.gz" &&  \
-	tar zxf lcms2.8.tar.gz  && ls && cd Little-CMS-lcms2.8 && ./autogen.sh &&  \
+RUN cd /usr/local/src/ &&  wget "https://invisible-mirror.net/archives/ncurses/ncurses-6.2.tar.gz" &&  \
+	tar zxf ncurses-6.2.tar.gz  && ls && cd ncurses* && ./configure --libdir=/usr/lib/arm-linux-gnueabihf --enable-widec --with-shared  &&  \
 	make && make install
 
-RUN apt-get update && apt-get install -y \
-	libfontconfig-dev uuid-dev libboost-all-dev
+
+#
+# remove dynamic libraries so we can use static ones
+#
+RUN rm /usr/lib/arm-linux-gnueabihf/libharfbuzz.so* 
+RUN rm /usr/lib/arm-linux-gnueabihf/libopenjp2.so* 
+RUN rm /usr/local/lib/libopenjp2.so*
+RUN rm /usr/lib/arm-linux-gnueabihf/libjpeg.so 
+RUN cp /usr/local/lib/libgraphite2.a /usr/lib/arm-linux-gnueabihf/
+RUN rm /usr/lib/arm-linux-gnueabihf/libgraphite2.so*
+
+#RUN cd /usr/local/src/ &&  wget "https://github.com/mm2/Little-CMS/archive/refs/tags/lcms2.8.tar.gz" &&  \
+#	tar zxf lcms2.8.tar.gz  && ls && cd Little-CMS-lcms2.8 && ./autogen.sh &&  \
+#	make && make install
+
+#RUN apt-get update && apt-get install -y \
+#	libfontconfig-dev uuid-dev libboost-all-dev
 
 
 
-RUN cd /usr/local/src/ && wget "https://gitlab.freedesktop.org/poppler/poppler/-/archive/poppler-21.12.0/poppler-poppler-21.12.0.tar.gz" && \
-	tar zxf poppler-poppler-21.12.0.tar.gz  && cd poppler-poppler-21.12.0 && mkdir build && cd build && \
-  	cmake .. -DENABLE_QT4=OFF -DENABLE_QT4=OFF -DWITH_NSS3=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_SHARED_LIBS=OFF  && \
-	make && make install
+#RUN cd /usr/local/src/ && wget "https://gitlab.freedesktop.org/poppler/poppler/-/archive/poppler-21.12.0/poppler-poppler-21.12.0.tar.gz" && \
+#	tar zxf poppler-poppler-21.12.0.tar.gz  && cd poppler-poppler-21.12.0 && mkdir build && cd build && \
+#  	cmake .. -DENABLE_QT4=OFF -DENABLE_QT4=OFF -DWITH_NSS3=OFF -DBUILD_SHARED_LIBS=OFF -DBUILD_SHARED_LIBS=OFF  && \
+#	make && make install
 
 #node-gyp ninja-build python
 
